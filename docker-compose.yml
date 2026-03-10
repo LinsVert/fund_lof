@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.4.8
+    container_name: lof-db
+    environment:
+      MYSQL_ROOT_PASSWORD: myrootpassword
+      MYSQL_DATABASE: lof_db
+      MYSQL_USER: lof_user
+      MYSQL_PASSWORD: lof_password
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+
+  lof-monitor:
+    build: .
+    container_name: lof-monitor
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    volumes:
+      # 前端代码挂载可以在开发时实时生效，无需重新build
+      - ./frontend:/app/frontend
+      # 后台代码也挂载，方便热更新代码而无需重新构建镜像
+      - ./backend:/app/backend
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+      # 使用 MySQL: mysql+pymysql://user:password@host:port/dbname
+      - DATABASE_URL=mysql+pymysql://lof_user:lof_password@db:3306/lof_db?charset=utf8mb4
+
+volumes:
+  db_data:
