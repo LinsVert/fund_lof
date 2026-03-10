@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOF 基金溢价监控</title>
+  <meta name="description" content="实时监控 LOF 基金一级市场（净值）与二级市场（场内价格）之间的溢价率，支持自动定时刷新。" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <div class="container">
+
+    <!-- ── Header ──────────────────────────────────────── -->
+    <header class="header">
+      <div class="header-left">
+        <h1>📈 LOF 基金溢价监控</h1>
+        <p class="subtitle">实时追踪一级市场净值与二级市场场内价格的溢价率</p>
+      </div>
+      <div class="header-right">
+        <div class="status-bar">
+          <span id="status-dot" class="status-dot"></span>
+          <span id="status-text">初始化中…</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+          <div style="display:flex;gap:8px">
+            <button id="refresh-btn" class="btn btn-primary">
+              <svg viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z" />
+                <path
+                  d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z" />
+              </svg>
+              立即刷新
+            </button>
+            <button id="nav-fetch-btn" class="btn">
+              💹 获取净值
+            </button>
+          </div>
+          <span id="nav-fetch-status"
+            style="font-size:11px;color:var(--text-muted);text-align:right">净值未加载，点击手动获取</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Summary Cards ────────────────────────────────── -->
+    <div class="summary-grid">
+      <div class="summary-card card-total">
+        <div class="card-label">监控总量</div>
+        <div id="stat-total" class="card-value">—</div>
+        <div class="card-sub">只 LOF 基金</div>
+      </div>
+      <div class="summary-card card-premium">
+        <div class="card-label">溢价基金</div>
+        <div id="stat-premium" class="card-value">—</div>
+        <div class="card-sub">场内价 &gt; 净值</div>
+      </div>
+      <div class="summary-card card-discount">
+        <div class="card-label">折价基金</div>
+        <div id="stat-discount" class="card-value">—</div>
+        <div class="card-sub">场内价 &lt; 净值</div>
+      </div>
+      <div class="summary-card card-top">
+        <div class="card-label">最高溢价</div>
+        <div id="stat-top" class="card-value">—</div>
+        <div class="card-sub">当前最高溢价基金</div>
+      </div>
+    </div>
+
+    <!-- ── Controls ─────────────────────────────────────── -->
+    <div class="controls">
+      <div class="search-box">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+            clip-rule="evenodd" />
+        </svg>
+        <input id="search-input" type="text" placeholder="搜索基金代码或名称…" autocomplete="off" />
+      </div>
+
+      <div class="filter-group">
+        <span>筛选</span>
+        <select id="filter-select">
+          <option value="all">全部</option>
+          <option value="premium">仅溢价</option>
+          <option value="discount">仅折价</option>
+          <option value="high">显著偏差（≥1%）</option>
+          <option value="nonav">净值未加载</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ── Table ─────────────────────────────────────────── -->
+    <div class="table-wrapper">
+      <div class="table-header-bar">
+        <span class="table-title">LOF 基金溢价详情</span>
+        <span id="table-count" class="table-count">—</span>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="code">基金代码</th>
+              <th>基金名称</th>
+              <th data-sort="price" style="text-align:right">场内价格</th>
+              <th data-sort="nav" style="text-align:right">单位净值</th>
+              <th data-sort="premium" class="sort-desc">溢价率</th>
+              <th data-sort="change" style="text-align:right">涨跌幅</th>
+              <th data-sort="high" style="text-align:right">最高价</th>
+              <th data-sort="volume" style="text-align:right">成交额</th>
+              <th style="text-align:center;cursor:default">调试</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr>
+              <td colspan="9">
+                <div class="state-overlay">
+                  <div class="spinner"></div>
+                  <div class="state-title">正在加载数据…</div>
+                  <div class="state-desc">正在从东方财富获取 LOF 基金行情和净值</div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Footer ────────────────────────────────────────── -->
+    <p style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:24px;">
+      数据来源：东方财富 · 天天基金 &nbsp;|&nbsp; 溢价率 = (场内价 − 净值) / 净值 × 100% &nbsp;|&nbsp;
+      行情和净值均为<strong style="color:var(--accent-blue)">手动刷新</strong>
+    </p>
+
+  </div>
+
+  <!-- ── Toast container ──────────────────────────────── -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
