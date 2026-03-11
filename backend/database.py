@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 
@@ -41,6 +41,11 @@ class Fund(Base):
     
     # 结果
     premium = Column(Float, nullable=True)
+    
+    # 申购限制与拖拉机
+    buy_status = Column(String(50), nullable=True) # e.g. "开放申购" / "暂停申购"
+    buy_limit = Column(Float, nullable=True) # 每日限购额度(元) / 不限制为null
+    tractor_max_accounts = Column(Integer, default=1) # 1: 普通(不支持拖拉机), >1: 支持拖拉机联申的账户数
     
     # 元数据
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

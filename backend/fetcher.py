@@ -151,7 +151,45 @@ async def fetch_nav_single(code: str) -> dict:
         res = await fetch_nav_fundgz(client, code)
         if not res.get("nav"):
             res = await fetch_nav_pingzhong(client, code)
+            
+        status_info = await fetch_buy_status(client, code)
+        if status_info:
+            res["buy_status"] = status_info.get("buy_status")
+            res["buy_limit"] = status_info.get("buy_limit")
+            
         return res
+
+async def fetch_buy_status(client: httpx.AsyncClient, code: str) -> dict:
+    url = f"https://fundmobapi.eastmoney.com/FundMApi/FundBaseTypeInformation.ashx?FCODE={code}&deviceid=Wap&plat=Wap&product=EFund&version=6.6.0"
+    try:
+        resp = await client.get(url, headers=NAV_HEADERS, timeout=8.0)
+        data = resp.json().get("Datas", {})
+        sgzt = data.get("SGZT", "")
+        
+        # 提取 "限大额(单日投资上限50万元)"、"限大额(单日投资上限1000元)" 中的数值
+        buy_status = ""
+        buy_limit = None
+        
+        if "暂停申购" in sgzt:
+            buy_status = "暂停申购"
+        elif "限大额" in sgzt:
+            buy_status = "限制大额申购"
+            m = re.search(r'上限([0-9.]+)万?元', sgzt)
+            if m:
+                val = float(m.group(1))
+                if "万" in sgzt[m.end(1):m.end(1)+2]:
+                    buy_limit = val * 10000
+                else:
+                    buy_limit = val
+        elif "开放申购" in sgzt:
+            buy_status = "开放申购"
+        else:
+            buy_status = sgzt
+            
+        return {"buy_status": buy_status, "buy_limit": buy_limit}
+    except Exception as e:
+        print(f"fetch buy status error for {code}: {e}")
+    return {}
 
 async def sync_spots_to_db():
     spots = await fetch_all_lof_spots()
@@ -162,6 +200,10 @@ async def sync_spots_to_db():
             fund = db.query(Fund).filter(Fund.code == spot["code"]).first()
             if not fund:
                 fund = Fund(code=spot["code"])
+                if spot["code"].startswith("16") and spot["code"] != "161226":
+                    fund.tractor_max_accounts = 6
+                else:
+                    fund.tractor_max_accounts = 1
                 db.add(fund)
                 
             fund.name = spot["name"]
@@ -198,6 +240,12 @@ async def sync_nav_to_db(code: str):
             
         fund.nav = res["nav"]
         fund.nav_time = res["nav_time"]
+        
+        if "buy_status" in res:
+            fund.buy_status = res["buy_status"]
+        if "buy_limit" in res:
+            fund.buy_limit = res["buy_limit"]
+            
         if fund.price and fund.nav > 0:
             fund.premium = (fund.price - fund.nav) / fund.nav * 100
             

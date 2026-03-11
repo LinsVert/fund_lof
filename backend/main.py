@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from sqlalchemy import text
 from .database import Base, engine, get_db, Fund
 from .fetcher import sync_spots_to_db, sync_nav_to_db, sync_all_navs_to_db
 
@@ -27,7 +28,31 @@ async def startup_event():
     for i in range(max_retries):
         try:
             Base.metadata.create_all(bind=engine)
-            print("Successfully connected to the database and initialized tables.")
+            
+            # 手动执行表结构升级 (应对新增列)
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text("ALTER TABLE lof_funds ADD COLUMN buy_status VARCHAR(50) DEFAULT NULL"))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("ALTER TABLE lof_funds ADD COLUMN buy_limit FLOAT DEFAULT NULL"))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("ALTER TABLE lof_funds ADD COLUMN tractor_max_accounts INTEGER DEFAULT 1"))
+                except Exception:
+                    pass
+                
+                # Apply defaults for existing rows (one-time logic)
+                try:
+                    conn.execute(text("UPDATE lof_funds SET tractor_max_accounts = 6 WHERE code LIKE '16%' AND code != '161226' AND tractor_max_accounts = 1"))
+                except Exception:
+                    pass
+                    
+                conn.commit()
+                
+            print("Successfully connected to the database and initialized/migrated tables.")
             break
         except Exception as e:
             if i < max_retries - 1:
@@ -73,10 +98,32 @@ def get_funds(db: Session = Depends(get_db)):
             "volume": f.volume,
             "priceTime": f.price_time,
             "navTime": f.nav_time,
+            "buyStatus": f.buy_status,
+            "buyLimit": f.buy_limit,
+            "tractorAccounts": getattr(f, "tractor_max_accounts", 1),
             "updatedAt": f.updated_at.isoformat() if f.updated_at else None
         }
         for f in funds
     ]
+
+@app.post("/api/fund/{code}/tractor")
+def toggle_tractor(code: str, db: Session = Depends(get_db)):
+    fund = db.query(Fund).filter(Fund.code == code).first()
+    if not fund:
+        return {"status": "error", "message": "Fund not found."}
+    
+    # 周期性切换: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 1
+    current = getattr(fund, "tractor_max_accounts", 1)
+    if current is None:
+        current = 1
+    
+    next_val = current + 1
+    if next_val > 6:
+        next_val = 1
+        
+    fund.tractor_max_accounts = next_val
+    db.commit()
+    return {"status": "ok", "tractorAccounts": fund.tractor_max_accounts}
 
 @app.post("/api/fetch/spot")
 async def fetch_spot_manual(background_tasks: BackgroundTasks):
