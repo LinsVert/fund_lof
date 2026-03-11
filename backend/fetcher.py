@@ -69,7 +69,7 @@ def parse_diff(data: dict) -> List[Dict]:
     return parsed
 
 async def fetch_all_lof_spots() -> List[Dict]:
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         first = await fetch_page(client, 1)
         total = first.get("data", {}).get("total", 0)
         items = parse_diff(first)
@@ -147,7 +147,7 @@ async def fetch_nav_pingzhong(client: httpx.AsyncClient, code: str) -> dict:
     return {}
 
 async def fetch_nav_single(code: str) -> dict:
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         res = await fetch_nav_fundgz(client, code)
         if not res.get("nav"):
             res = await fetch_nav_pingzhong(client, code)
