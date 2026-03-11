@@ -28,7 +28,6 @@ const searchInput = document.getElementById('search-input');
 const filterSelect = document.getElementById('filter-select');
 const refreshBtn = document.getElementById('refresh-btn');
 const navFetchBtn = document.getElementById('nav-fetch-btn');
-const navDebugFetchAllBtn = document.getElementById('nav-debug-fetch-all-btn');
 const navFetchStatus = document.getElementById('nav-fetch-status');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
@@ -298,29 +297,6 @@ searchInput.addEventListener('input', applyFilters);
 filterSelect.addEventListener('change', applyFilters);
 refreshBtn.addEventListener('click', () => { triggerSpotRefresh(); });
 navFetchBtn.addEventListener('click', fetchNavManual);
-
-if (navDebugFetchAllBtn) {
-  navDebugFetchAllBtn.addEventListener('click', async () => {
-    if (isLoading) return;
-    isLoading = true;
-    navDebugFetchAllBtn.disabled = true;
-    setStatus('loading', '正在触发后端全量更新净值…');
-    try {
-      const res = await fetch(`${API_BASE}/fetch/navs/all`, { method: 'POST' });
-      if (!res.ok) throw new Error('触发全量净值更新失败');
-      toast('已启动后台全量净值同步，请耐心等待并在稍后刷新查看', 'success');
-      setTimeout(() => {
-        isLoading = false;
-        navDebugFetchAllBtn.disabled = false;
-        loadData();
-      }, 3000);
-    } catch (e) {
-      toast(e.message, 'error');
-      isLoading = false;
-      navDebugFetchAllBtn.disabled = false;
-    }
-  });
-}
 
 // 行级更新按钮：通知后端去抓取最新净值
 tableBody.addEventListener('click', async (e) => {
