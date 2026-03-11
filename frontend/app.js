@@ -232,9 +232,7 @@ function renderTable() {
         <div class="name-cell" title="${f.name}" style="display:flex;align-items:center;">
           ${f.name}
           ${renderBuyStatus(f.buyStatus, f.buyLimit)}
-          <span class="tractor-toggle ${f.tractorAccounts > 1 ? 'active' : ''}" data-code="${f.code}" title="点击修改拖拉机账户数量 (1-6)">
-            🚜<span class="tractor-count">${f.tractorAccounts > 1 ? f.tractorAccounts : ''}</span>
-          </span>
+          ${f.tractorAccounts > 1 ? `<span class="tractor-badge" style="font-size:10px;margin-left:6px;padding:2px 4px;border-radius:4px;color:#fff;background:var(--accent-blue);font-weight:600;" title="单日申购支持的最大子账户数量">一拖${f.tractorAccounts}</span>` : ''}
         </div>
       </td>
       <td class="price-cell">
@@ -326,34 +324,6 @@ if (navDebugFetchAllBtn) {
 
 // 行级更新按钮：通知后端去抓取最新净值
 tableBody.addEventListener('click', async (e) => {
-  // 拖拉机标记切换 (1~6循环)
-  let toggleBtn = e.target.classList.contains('tractor-toggle') ? e.target : e.target.closest('.tractor-toggle');
-  if (toggleBtn) {
-    const code = toggleBtn.dataset.code;
-    toggleBtn.style.opacity = '0.5';
-    try {
-      const res = await fetch(`${API_BASE}/fund/${code}/tractor`, { method: 'POST' });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        const count = data.tractorAccounts;
-        toggleBtn.classList.toggle('active', count > 1);
-        const countSpan = toggleBtn.querySelector('.tractor-count');
-        if (countSpan) countSpan.textContent = count > 1 ? count : '';
-
-        const f = allFunds.find(x => x.code === code);
-        if (f) f.tractorAccounts = count;
-        toast(`${code} 拖拉机账户数已更新为 ${count}`, 'success');
-      } else {
-        toast(data.message || '切换失败', 'error');
-      }
-    } catch (err) {
-      toast('网络请求失败', 'error');
-    } finally {
-      toggleBtn.style.opacity = '1';
-    }
-    return;
-  }
-
   const btn = e.target.closest('.btn-row-nav');
   if (!btn) return;
   const code = btn.dataset.code;
